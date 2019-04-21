@@ -5,46 +5,46 @@ import math
 
 from parse_data import *
 
-def find_hipotesis(vars, weights, data_name):
-    res = weights['bias']
-    for key in data_name:
-        res += vars[key] * weights[key]
-    return 1 / (1 + math.exp((-res)))
+def preprocessing(dataset):
+	tmp = dataset.dropna()
+	features = numpy.array((tmp.iloc[:,5:]))
+	labels = numpy.array(tmp.loc[:,"Hogwarts House"])
+	numpy.apply_along_axis(normalize, 0, features)
+	return features, labels
 
-def check_acc(old, new, acc):
-    for key in old.keys():
-        if abs(old[key] - new[key]) >= accuracy:
-            return 1
-    return 0
-
-def update_weights(weights, dataset, l_rate, house_num, data_name):
-    for i, row in dataset.iterrows():
-        res = 0 if row["Hogwarts House"] != house_num else 1
-        hipotesis = find_hipotesis(row.to_dict(), weights, data_name)
-        for col_name in data_name:
-            weights[col_name] += (l_rate * (res - hipotesis) * hipotesis * (1 - hipotesis) * row[col_name])
-        weights['bias'] += l_rate * (res - hipotesis)
-    return weights
-
-def house_learn(dataset, l_rate, x, n_iter, accurancy, data_name):
-	weights = dict(map(lambda x: (x, 0), data_name + ['bias', ]))
-	for i in range(n_iter):
-		new_weights = update_weights(copy.deepcopy(weights), dataset, l_rate, x, data_name)
-		if check_acc(weights, new_weights, accurancy) == 1:
-			break
-		weights = new_weights
-	return weights
-
-def get_weights(dataset, output_file, n_iter, l_rate, accurancy, data_name):
+def get_weights(dataset, output_file, n_iter, l_rate, accurancy):
 	weights = []
-	for x in range(4):
-		weights.append(house_learn(dataset, l_rate, x, n_iter, accurancy, data_name))
+	features, labels = preprocessing(dataset)
+	features = numpy.insert(features, 0, 1, axis=1)
+	tmp = features.shape[0]
+	for i in numpy.unique(labels):
+		y_copy = numpy.where(labels == i, 1, 0)
+		tmp_weights = numpy.ones(features.shape[1])
+		for _ in range(n_iter):
+			output = features.dot(tmp_weights)
+			errors = y_copy - (1 / (1 + numpy.exp(-output)))
+			gradient = numpy.dot(features.T, errors)
+			tmp_weights += 5e-5 * gradient
+		weights.append((tmp_weights, i))
+	numpy.save(output_file, weights)
 	return weights
+
+def predict(x, weights):
+	return max((x.dot(w), c) for w, c in weights)[1]
+
+def estimate_error(dataset, weights):
+	features, labels = preprocessing(dataset)
+	return sum([predict(i, weights) for i in numpy.insert(features, 0, 1, axis=1)] == labels) / len(labels)   
 
 def logreg_train(argv):
-	dataset, output_file, n_iter, l_rate, accurancy = read_data_for_train(argv, 'python3 logreg_train.py [-h] [-o O] [-n N] [-lr LR] [-acc ACC] path_to_csv_file')
-	dataset, data_name = normalize(dataset)
-	weights = get_weights(dataset, output_file, n_iter, l_rate, accurancy, data_name)
+	try:
+		dataset, output_file, n_iter, l_rate, accurancy = read_data_for_train(argv, 'python3 logreg_train.py [-h] [-o O] [-n N] [-lr LR] [-acc ACC] path_to_csv_file')
+		weights = get_weights(dataset, output_file, n_iter, l_rate, accurancy)
+		print('Model has been trained!')
+		print('Accuracy: {:3.2f}%'.format(estimate_error(dataset, weights)))
+		print(f'Weights has been saved to "{output_file}"')
+	except Exception:
+		print("Hmmmmmm... Something went wrong...")
 
 if __name__ == "__main__":
 	logreg_train(sys.argv[1:])

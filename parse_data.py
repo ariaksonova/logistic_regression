@@ -1,6 +1,11 @@
 import pandas
 import argparse
 
+def normalize(X):
+	for i in range(len(X)):
+		X[i] = ( X[i] - X.mean())  / X.std()
+	return X
+
 def find_all_num(dataset):
 	data_name = []
 	for x in dataset.columns:
@@ -32,8 +37,8 @@ def read_data_for_train(args, my_str):
                         help="It is path to your file for train model.")
     parser.add_argument('-o',
                         type=str,
-                        help="It is output json file with weights.",
-                        default="result.json")
+                        help="It is output file with weights.",
+                        default="result")
     parser.add_argument('-n',
                         type=int,
                         help='It is number iterations.',
@@ -47,26 +52,23 @@ def read_data_for_train(args, my_str):
                         help='It is accuracy.',
                         default=0.1)
     args = parser.parse_args(args)
-    dataset = pandas.read_csv(args.path_to_csv_file, usecols=[
-    'Astronomy',
-    'Herbology',
-    'Divination',
-    'Muggle Studies',
-    'History of Magic',
-    'Transfiguration',
-    'Charms',
-    'Flying',
-    'Hogwarts House', ])
+    dataset = pandas.read_csv(args.path_to_csv_file, index_col = "Index")
     return dataset, args.o, args.n, args.lr, args.acc
 
-def normalize(dataset):
-	data_name = find_all_num(dataset)
-	data_name.remove("Hogwarts House")
-	tmp_dataset = dataset[data_name]
-	tmp_dataset = tmp_dataset.dropna()
-	result = tmp_dataset.copy()
-	for x in data_name:
-		max_value = tmp_dataset[x].max()
-		min_value = tmp_dataset[x].min()
-		result[x] = ((tmp_dataset[x] - min_value) / (max_value - min_value))
-	return result, data_name
+
+def read_data_for_test(args, my_str):
+	parser = argparse.ArgumentParser(usage=my_str)
+	parser.add_argument('path_to_csv_file',
+						type=str,
+						help='It is path to your file for test model."')
+	parser.add_argument('-s',
+						type=str,
+						help='It is output file name.',
+						default='houses.csv')
+	parser.add_argument('-w',
+						type=str,
+						help='It is file with weights.',
+						default="result.npy")
+	args = parser.parse_args(args)
+	dataset = pandas.read_csv(args.path_to_csv_file, index_col = "Index")
+	return dataset, args.s, args.w
